@@ -1,0 +1,25 @@
+# rules.yaml as described in the design document
+schema_name: "EnrichedCDRRecord"
+fields:
+  # Simple mapping with explicit type and documentation
+  - name: "imsi"
+    path: "callEventRecord.servingNetwork.imsi"
+    type: "string"
+    doc: "The International Mobile Subscriber Identity."
+
+  # Auto-named field using path
+  - path: "callEventRecord.callDuration"
+    type: "long"
+    doc: "Duration of the call in seconds."
+
+  # Rule to reduce a list of sub-records
+  - reduce: "callEventRecord.listOfServiceChanges"
+    as: "service" # prefix for flattened field names
+    rules:
+      "min": "timeOfFirstUsage"
+      "max": "timeOfLastUsage"
+      "sum": "dataVolumeGPRSDownlink"
+      "count": "" # Counts all items in the list
+
+  # Rule for Cartesian product
+  - expand: "callEventRecord.locations"

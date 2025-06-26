@@ -1,0 +1,88 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.gamma</groupId>
+    <artifactId>asn1-processor-parent</artifactId>
+    <version>0.1.0</version>
+    <packaging>pom</packaging>
+
+    <name>ASN.1 Processor Parent</name>
+    <description>Parent project for the ASN.1 Processing Library</description>
+
+    <properties>
+        <java.version>11</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <antlr.version>4.13.1</antlr.version>
+        <avro.version>1.11.3</avro.version>
+        <snakeyaml.version>2.0</snakeyaml.version>
+        <junit.version>5.10.1</junit.version>
+        <slf4j.version>2.0.9</slf4j.version>
+    </properties>
+
+    <modules>
+        <module>grammar-parser</module>
+        <module>asn1-core</module>
+        <module>asn1-flattener</module>
+        <module>asn1-cli</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Internal Modules -->
+            <dependency>
+                <groupId>com.gamma</groupId>
+                <artifactId>asn1-grammar-parser</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.gamma</groupId>
+                <artifactId>asn1-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.gamma</groupId>
+                <artifactId>asn1-flattener</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- External Libraries -->
+            <dependency>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr4-runtime</artifactId>
+                <version>${antlr.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.avro</groupId>
+                <artifactId>avro</artifactId>
+                <version>${avro.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>${snakeyaml.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-simple</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+
+            <!-- Testing -->
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-api</artifactId>
+                <version>${junit.version}</version>
+                <scope>test</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>
