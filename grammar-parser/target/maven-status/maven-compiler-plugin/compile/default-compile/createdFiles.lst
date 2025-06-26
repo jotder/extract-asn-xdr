@@ -1,0 +1,11 @@
+com/gamma/asn1/grammar/ASN1Parser.class
+com/gamma/asn1/grammar/SchemaElement.class
+com/gamma/asn1/model/ASN1TypeDefinition$ASN1Field.class
+com/gamma/asn1/grammar/ASN1GrammarParser.class
+com/gamma/asn1/grammar/ASN1GrammarParser$ASN1TypeDefinition.class
+com/gamma/asn1/grammar/ASN1Schema.class
+com/gamma/asn1/model/ASN1TypeDefinition.class
+com/gamma/asn1/grammar/ASN1Type.class
+com/gamma/asn1/grammar/ASN1Lexer.class
+com/sigma/asn1/grammarparser/Placeholder.class
+com/gamma/asn1/grammar/ASN1GrammarParser$ASN1TypeDefinition$ASN1Field.class

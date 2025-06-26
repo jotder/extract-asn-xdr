@@ -34,9 +34,9 @@ public class TLVEventStreamer {
      * @throws IOException         If an I/O error occurs while reading from the stream.
      * @throws CorruptTLVException If the TLV structure is malformed (e.g., unexpected end of stream).
      */
-    public void process(InputStream inputStream, TLVListener listener) throws Exception {
+    public void process(InputStream inputStream, TLVListener listener) throws IOException, ASN1ProcessingException {
         // The initial call processes until the stream ends.
-        processRecursive(inputStream, listener, Long.MAX_VALUE);
+        processRecursive(inputStream, listener, Long.MAX_VALUE, "root"); // Assuming "root" for top-level path
     }
 
     /**
@@ -45,115 +45,144 @@ public class TLVEventStreamer {
      * @param inputStream   The stream to read from.
      * @param listener      The listener for events.
      * @param bytesToProcess The number of bytes that constitute the current constructed element's value.
+     * @param currentPath   The current ASN.1 path for context in exceptions.
      * @return The total number of bytes read during this invocation.
      */
-    private long processRecursive(InputStream inputStream, TLVListener listener, long bytesToProcess) throws Exception {
+    private long processRecursive(InputStream inputStream, TLVListener listener, long bytesToProcess, String currentPath) throws IOException, ASN1ProcessingException {
         long localBytesRead = 0;
+        long tagStartOffset;
 
-        // Continue processing as long as we haven't consumed the expected number of bytes
-        // for the current scope and the stream has data.
         while (localBytesRead < bytesToProcess) {
+            tagStartOffset = this.bytesRead;
             int firstTagByte = inputStream.read();
+
             if (firstTagByte == -1) {
-                // End of stream. If we were expecting more bytes, the data is truncated.
                 if (bytesToProcess != Long.MAX_VALUE && localBytesRead < bytesToProcess) {
-                    throw new Exception("Unexpected end of stream while processing a constructed type.");
+                    throw new CorruptTLVException("Unexpected end of stream while processing a constructed type.", this.bytesRead, currentPath, null);
                 }
-                break; // Clean exit at end of stream.
+                break;
             }
             this.bytesRead++;
             localBytesRead++;
 
-            // --- 1. Parse Tag ---
-            // A full implementation would handle multi-byte tags here.
-            // For this example, we assume a single-byte tag.
             byte[] tag = {(byte) firstTagByte};
-            boolean isConstructed = (firstTagByte & 0x20) != 0; // Bit 6 indicates if type is constructed
+            boolean isConstructed = (firstTagByte & 0x20) != 0;
 
-            // --- 2. Parse Length ---
-            int length = parseLength(inputStream);
-            // The bytes read for the length field are part of the parent's value.
-            // This is a simplification; a real implementation would track this more granularly.
+            // Store current global offset before parsing length, as parseLength also increments bytesRead
+            long lengthFieldStartOffset = this.bytesRead;
+            int length;
+            try {
+                length = parseLength(inputStream);
+            } catch (CorruptTLVException e) {
+                // Enhance exception with current context
+                throw new CorruptTLVException(e.getMessage(), e.getByteOffset(), currentPath + ".length", e.getCause());
+            }
+            // localBytesRead for length field is accounted for by parseLength's increment of this.bytesRead
+            // and then taking the difference if needed, but simpler to track overall consumption.
 
-            listener.onStartTag(tag, length, isConstructed);
-
-            // --- 3. Process Value ---
-            if (isConstructed) {
-                // The "value" is a nested sequence of TLV triplets. Recurse.
-                long nestedBytes = processRecursive(inputStream, listener, length);
-                if (nestedBytes != length) {
-                    try {
-                        throw new Exception(
-                                String.format("Constructed type with length %d contained %d bytes.", length, nestedBytes)
-                        );
-                    } catch (Exception e) {
-                        throw new Exception(e);
-                    }
-                }
-            } else {
-                // The "value" is a primitive. Read it directly.
-                if (length > 0) {
-                    byte[] value = readValue(inputStream, length);
-                    listener.onPrimitiveValue(value);
-                } else {
-                    // Handle zero-length primitive value
-                    listener.onPrimitiveValue(new byte[0]);
-                }
+            try {
+                listener.onStartTag(tag, length, isConstructed, tagStartOffset);
+            } catch (Exception e) { // Listener can throw generic Exception as per its signature
+                 throw new ASN1ProcessingException("Listener failed onStartTag for tag " + bytesToHex(tag), tagStartOffset, currentPath, e);
             }
 
-            listener.onEndTag(tag);
-            localBytesRead += length;
+
+            if (isConstructed) {
+                String nextPath = currentPath + "." + bytesToHex(tag); // Example path segment
+                long nestedBytesRead = processRecursive(inputStream, listener, length, nextPath);
+                if (nestedBytesRead != length) {
+                     throw new CorruptTLVException(
+                                String.format("Constructed type with tag %s and declared length %d contained %d bytes.", bytesToHex(tag), length, nestedBytesRead),
+                                tagStartOffset, nextPath, null);
+                }
+                localBytesRead += nestedBytesRead; // Value bytes are the sum of children's full TLV sizes
+            } else {
+                if (length > 0) {
+                    byte[] value = readValue(inputStream, length, currentPath + "." + bytesToHex(tag) + ".value");
+                    try {
+                        listener.onPrimitiveValue(value);
+                    } catch (Exception e) {
+                        throw new ASN1ProcessingException("Listener failed onPrimitiveValue for tag " + bytesToHex(tag), this.bytesRead - length, currentPath, e);
+                    }
+                } else {
+                    try {
+                        listener.onPrimitiveValue(new byte[0]);
+                    } catch (Exception e) {
+                         throw new ASN1ProcessingException("Listener failed onPrimitiveValue (empty) for tag " + bytesToHex(tag), this.bytesRead, currentPath, e);
+                    }
+                }
+                localBytesRead += length; // Value bytes
+            }
+
+            try {
+                listener.onEndTag(tag);
+            } catch (Exception e) {
+                 throw new ASN1ProcessingException("Listener failed onEndTag for tag " + bytesToHex(tag), this.bytesRead, currentPath, e);
+            }
         }
         return localBytesRead;
     }
 
-    /**
-     * Parses the length octets from the stream.
-     * Handles both short form (single byte) and long form (multi-byte) length definitions.
-     */
-    private int parseLength(InputStream inputStream) throws  Exception {
+    private int parseLength(InputStream inputStream) throws IOException, CorruptTLVException {
+        long lengthStartOffset = this.bytesRead;
         int firstLengthByte = inputStream.read();
+        if (firstLengthByte == -1) {
+            throw new CorruptTLVException("Unexpected end of stream while reading length.", lengthStartOffset, "currentPath.length", null);
+        }
         this.bytesRead++;
 
-        if (firstLengthByte == -1) {
-            throw new Exception();
-        }
-
         if ((firstLengthByte & 0x80) == 0) {
-            // Short form: the byte itself is the length (0-127)
             return firstLengthByte;
         } else {
-            // Long form: bottom 7 bits indicate how many subsequent bytes define the length
             int numLengthBytes = firstLengthByte & 0x7F;
-            if (numLengthBytes == 0 || numLengthBytes > 4) {
-                // Indefinite length or length > 4 bytes (fits in an int) is not supported for simplicity.
-                throw new Exception("Unsupported length form: " + numLengthBytes);
+            if (numLengthBytes == 0) {
+                 throw new CorruptTLVException("Indefinite length form not supported.", lengthStartOffset, "currentPath.length", null);
+            }
+            if (numLengthBytes > 4) {
+                throw new CorruptTLVException("Length field too long (max 4 bytes for int): " + numLengthBytes, lengthStartOffset, "currentPath.length", null);
             }
 
-            byte[] lengthBytes = readValue(inputStream, numLengthBytes);
+            byte[] lengthBytes = readValue(inputStream, numLengthBytes, "currentPath.lengthValue");
             int length = 0;
             for (byte b : lengthBytes) {
                 length = (length << 8) | (b & 0xFF);
             }
+            // Check for impossibly large lengths if needed, e.g., if length would cause int overflow during accumulation.
+            // For now, numLengthBytes > 4 handles this for standard int.
             return length;
         }
     }
 
-    /**
-     * Reads a specified number of bytes from the stream.
-     */
-    private byte[] readValue(InputStream inputStream, int length) throws Exception {
+    private byte[] readValue(InputStream inputStream, int length, String pathContext) throws IOException, CorruptTLVException {
         if (length < 0) {
-            throw new Exception("Invalid negative length specified: " + length);
+            throw new CorruptTLVException("Invalid negative length specified: " + length, this.bytesRead, pathContext, null);
         }
         byte[] value = new byte[length];
-        int bytesActuallyRead = inputStream.read(value);
-        this.bytesRead += bytesActuallyRead;
+        int totalBytesActuallyRead = 0;
+        int bytesReadThisTime;
 
-        if (bytesActuallyRead != length) {
-            throw new Exception(
-                    String.format("Expected to read %d bytes for value, but stream ended after %d.", length));
+        long valueStartOffset = this.bytesRead;
+
+        while(totalBytesActuallyRead < length) {
+            bytesReadThisTime = inputStream.read(value, totalBytesActuallyRead, length - totalBytesActuallyRead);
+            if (bytesReadThisTime == -1) {
+                 throw new CorruptTLVException(
+                    String.format("Expected to read %d bytes for value, but stream ended after %d at path %s.", length, totalBytesActuallyRead, pathContext),
+                    valueStartOffset, pathContext, null);
+            }
+            totalBytesActuallyRead += bytesReadThisTime;
         }
+        this.bytesRead += totalBytesActuallyRead; // totalBytesActuallyRead should be equal to length here
         return value;
+    }
+
+    // Helper to convert byte array to hex string for logging/exceptions
+    private static String bytesToHex(byte[] bytes) {
+        if (bytes == null) return "null";
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02X", b));
+        }
+        return sb.toString();
     }
 }
