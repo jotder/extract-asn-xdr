@@ -12,12 +12,22 @@ public class ASN1ProcessingException extends Exception {
     public ASN1ProcessingException(String message, long byteOffset, String tagPath, Throwable cause) {
         super(message, cause);
         this.byteOffset = byteOffset;
-        this.tagPath = tagPath;
+        this.tagPath = (tagPath == null || tagPath.isEmpty()) ? "unknown" : tagPath;
+    }
+
+    public long getByteOffset() {
+        return byteOffset;
+    }
+
+    public String getTagPath() {
+        return tagPath;
     }
 
     @Override
     public String getMessage() {
-        return String.format("%s at byte offset ~%d (path: %s)",
-                super.getMessage(), byteOffset, tagPath);
+        String baseMessage = super.getMessage();
+        return String.format("%s (Path: %s, Offset: ~%d)",
+                baseMessage == null ? "" : baseMessage,
+                tagPath, byteOffset);
     }
 }

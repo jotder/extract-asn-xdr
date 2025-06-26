@@ -1,23 +1,25 @@
 package com.gamma.asn1.core.exception;
 
 /**
- * Base exception for all recoverable processing errors within the library.
- * Contains rich context to help with debugging and error handling strategies.
+ * Thrown when a malformed Tag-Length-Value structure is detected in the input stream.
+ * For example, an invalid length encoding or unexpected end of stream.
  */
-public class CorruptTLVException extends Exception {
+public class CorruptTLVException extends ASN1ProcessingException {
 
-      long byteOffset;
-     String tagPath;
+    // Optionally, include the specific raw bytes that caused the issue if available and useful.
+    // private final byte[] rawDataChunk;
 
     public CorruptTLVException(String message, long byteOffset, String tagPath, Throwable cause) {
-        super(message, cause);
-        this.byteOffset = byteOffset;
-        this.tagPath = tagPath;
+        super(message, byteOffset, tagPath, cause);
+        // this.rawDataChunk = null; // Or assign if passed
     }
 
-    @Override
-    public String getMessage() {
-        return String.format("%s at byte offset ~%d (path: %s)",
-                super.getMessage(), byteOffset, tagPath);
+    public CorruptTLVException(String message, long byteOffset, String tagPath, Throwable cause, byte[] rawDataChunk) {
+        super(message, byteOffset, tagPath, cause);
+        // this.rawDataChunk = rawDataChunk; // Store if needed
     }
+
+    // public byte[] getRawDataChunk() {
+    //     return rawDataChunk;
+    // }
 }

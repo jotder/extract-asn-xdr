@@ -55,49 +55,45 @@ public class SemanticEventMapper implements TLVListener {
 
         if (parentState == null) {
             // This is a top-level element
+            // TODO: Ensure schema.findElementByTag and parentState.definition.findChildByTag are robust
+            // and throw appropriate exceptions (e.g., GrammarMismatchException).
+            // The existing grammar classes (ASN1Schema, SchemaElement) from grammar-parser module need to be available.
             elementDef = schema.findElementByTag(tag)
-                    .orElseThrow(() -> new Exception("Unknown top-level tag"));
+                    .orElseThrow(() -> new ASN1ProcessingException("Unknown top-level tag: " + bytesToHex(tag), offset, buildCurrentPath(), null));
         } else {
             // This is a nested element, look for it within the parent's definition
             if (!parentState.isConstructed) {
-                throw new Exception("Data stream contains nested element where schema expects a primitive");
+                throw new ASN1ProcessingException("Data stream contains nested element where schema expects a primitive", offset, buildCurrentPath(), null);
             }
             elementDef = parentState.definition.findChildByTag(tag)
-                    .orElseThrow(() -> new Exception("Unknown nested tag"));
+                    .orElseThrow(() -> new ASN1ProcessingException("Unknown nested tag: " + bytesToHex(tag) + " within " + parentState.definition.getName(), offset, buildCurrentPath(), null));
         }
 
         stateStack.push(new StateTuple(elementDef, isConstructed));
     }
 
-    /**
-     * Note: This method exists for compatibility with the current TLVListener interface.
-     * It is recommended to update the interface to have only the version with the 'offset' parameter.
-     */
     @Override
-    public void onStartTag(byte[] tag, int length, boolean isConstructed) throws Exception {
-        // Delegate to the more specific method, using -1 to indicate an unknown offset.
-        onStartTag(tag, length, isConstructed, -1L);
-    }
-
-    @Override
-    public void onPrimitiveValue(byte[] value) {
+    public void onPrimitiveValue(byte[] value) throws ASN1ProcessingException {
         StateTuple currentState = stateStack.peek();
-        if (currentState == null || currentState.isConstructed) {
-            // This indicates a structural mismatch between the stream and our state machine.
-            // It should ideally be caught by other checks, but serves as a safeguard.
-            throw new IllegalStateException("Received primitive value for a constructed type or in an invalid state.");
+        if (currentState == null) {
+            throw new ASN1ProcessingException("Received primitive value in an invalid null state.", -1, buildCurrentPath(), null);
+        }
+        if (currentState.isConstructed) {
+             throw new ASN1ProcessingException("Received primitive value for a constructed type: " + currentState.definition.getName(), -1, buildCurrentPath(), null);
         }
 
         String path = buildCurrentPath();
         ASN1Type type = currentState.definition.getType();
+        // TODO: Ensure listener.onField can handle potential exceptions or declared them.
         listener.onField(path, value, type);
     }
 
     @Override
-    public void onEndTag(byte[] tag) {
+    public void onEndTag(byte[] tag) throws ASN1ProcessingException {
         if (stateStack.isEmpty()) {
-            throw new IllegalStateException("Received onEndTag event with an empty state stack. Mismatched tags.");
+            throw new ASN1ProcessingException("Received onEndTag event with an empty state stack. Mismatched tags for tag: " + bytesToHex(tag), -1, buildCurrentPath(), null);
         }
+        // TODO: Optionally, verify that the ending tag matches currentState.definition.getTag()
         stateStack.pop();
     }
 
@@ -112,8 +108,16 @@ public class SemanticEventMapper implements TLVListener {
         // The stream of definitions is reversed to build the path from root to leaf.
         return stateStack.stream()
                 .map(s -> s.definition.getName())
-                .collect(Collectors.toCollection(ArrayDeque::new))
-                .descendingIterator().
-                next().toString();
+                .collect(Collectors.joining("."));
+    }
+
+    // Helper to convert byte array to hex string for logging/exceptions
+    private static String bytesToHex(byte[] bytes) {
+        if (bytes == null) return "null";
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02X", b));
+        }
+        return sb.toString();
     }
 }

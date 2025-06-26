@@ -13,6 +13,7 @@ public interface FlattenerListener {
      * @param path     The dot-separated path to the field, derived from the schema (e.g., "record.header.id").
      * @param rawValue The raw bytes of the primitive value.
      * @param type     The {@link ASN1Type} of the field as defined in the schema, which guides final decoding.
+     * @throws Exception if an error occurs during processing of the field by the listener.
      */
-    void onField(String path, byte[] rawValue, ASN1Type type);
+    void onField(String path, byte[] rawValue, ASN1Type type) throws Exception;
 }
