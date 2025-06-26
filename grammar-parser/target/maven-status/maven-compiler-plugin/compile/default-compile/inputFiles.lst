@@ -3,7 +3,8 @@
 /app/grammar-parser/src/main/java/com/gamma/asn1/grammar/ASN1Parser.java
 /app/grammar-parser/src/main/java/com/gamma/asn1/grammar/ASN1Schema.java
 /app/grammar-parser/src/main/java/com/gamma/asn1/grammar/ASN1SchemaBuilder.java
-/app/grammar-parser/src/main/java/com/gamma/asn1/grammar/ASN1Type.java
-/app/grammar-parser/src/main/java/com/gamma/asn1/grammar/SchemaElement.java
+/app/grammar-parser/src/main/java/com/gamma/asn1/model/ASN1BaseType.java
+/app/grammar-parser/src/main/java/com/gamma/asn1/model/ASN1TagInfo.java
 /app/grammar-parser/src/main/java/com/gamma/asn1/model/ASN1TypeDefinition.java
-/app/grammar-parser/src/main/java/com/sigma/asn1/grammarparser/Placeholder.java
+/app/grammar-parser/src/main/java/com/gamma/asn1/model/TagClass.java
+/app/grammar-parser/src/main/java/com/gamma/asn1/model/TaggingMode.java
