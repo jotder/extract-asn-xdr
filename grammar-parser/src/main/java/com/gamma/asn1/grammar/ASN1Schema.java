@@ -1,6 +1,7 @@
 package com.gamma.asn1.grammar;
 
 import com.gamma.asn1.model.ASN1TypeDefinition;
+// Removed: import com.gamma.asn1.model.SchemaElement; // As SchemaElement is deleted
 
 import java.io.Serializable;
 import java.util.Map;
@@ -26,39 +27,63 @@ public class ASN1Schema implements Serializable {
     /**
      * Adds a new type definition to the schema.
      * @param name The name of the type (e.g., "CallEventRecord").
-     * @param definition The fully parsed definition object, expected to be a SchemaElement or adaptable to it.
+     * @param definition The fully parsed {@link ASN1TypeDefinition} object.
      */
     public void addTypeDefinition(String name, ASN1TypeDefinition definition) {
-        // Assuming ASN1TypeDefinition is compatible or can be adapted to SchemaElement.
-        // This might require changes if ASN1TypeDefinition and SchemaElement are fundamentally different.
         this.typeDefinitions.put(name, definition);
     }
 
     /**
-     * Finds a top-level schema element by its tag.
-     * The actual implementation will involve iterating typeDefinitions and checking tags.
-     * @param tag The ASN.1 tag.
-     * @return An Optional containing the SchemaElement if found, otherwise empty.
+     * Finds a top-level type definition by its ASN.1 tag.
+     * This method would typically be used to find the definition of an implicitly tagged
+     * top-level type in a BER/DER encoded message.
+     *
+     * <p>Note: The actual tag matching logic can be complex, involving tag class,
+     * number, and potentially information about IMPLICIT/EXPLICIT tagging context
+     * if searching within a specific module or context. This implementation is a placeholder
+     * and a full implementation would require a robust ASN.1 parsing and resolution engine.</p>
+     *
+     * @param tagBytes The raw byte array of the ASN.1 tag.
+     * @return An Optional containing the {@link ASN1TypeDefinition} if a uniquely matching
+     *         type definition is found, otherwise empty.
      */
-    public Optional<SchemaElement> findElementByTag(byte[] tag) {
-        // Placeholder implementation - actual logic will search through typeDefinitions
-        // and potentially adapt ASN1TypeDefinition to SchemaElement if they are different entities.
-        for (ASN1TypeDefinition def : typeDefinitions.values()) {
-            if (def instanceof SchemaElement) { // This is a simplification
-                // TODO: Implement proper tag matching logic on SchemaElement/ASN1TypeDefinition
-                // if (((SchemaElement) def).matchesTag(tag)) {
-                //     return Optional.of((SchemaElement) def);
-                // }
-            }
-        }
-        return Optional.empty(); // Placeholder
+    public Optional<ASN1TypeDefinition> findElementByTag(byte[] tagBytes) {
+        // Placeholder implementation.
+        // Actual logic would involve:
+        // 1. Parsing the tagBytes to extract tag class, number, and constructed/primitive flag.
+        // 2. Iterating through typeDefinitions.values().
+        // 3. For each ASN1TypeDefinition, get its ASN1TagInfo.
+        // 4. Compare the parsed tag from tagBytes with the ASN1TagInfo.
+        //    - This needs to consider default tagging (UNIVERSAL class for standard types if no explicit tag).
+        //    - For example, an INTEGER is UNIVERSAL 2. A [CONTEXT 0] INTEGER would have different tagInfo.
+        //    - The matching needs to be precise.
+        // 5. This is a simplified placeholder. Real-world scenarios might require more context
+        //    (e.g., if multiple types could potentially match a CONTEXT_SPECIFIC tag,
+        //    disambiguation rules or further schema information would be needed).
+
+        // Example conceptual check (not fully functional without tag parsing and full TagInfo comparison):
+        // for (ASN1TypeDefinition def : typeDefinitions.values()) {
+        //     if (def.getTagInfo() != null) {
+        //         // Hypothetical TagParser.parse(tagBytes) would return an object (e.g. ParsedTag)
+        //         // ParsedTag inputTag = TagParser.parse(tagBytes);
+        //         // ASN1TagInfo schemaTag = def.getTagInfo();
+        //         // if (inputTag.getTagClass() == schemaTag.getTagClass() &&
+        //         //     inputTag.getTagNumber() == schemaTag.getTagNumber()) {
+        //         //     return Optional.of(def);
+        //         // }
+        //     } else {
+        //         // Handle types with default UNIVERSAL tags (e.g. INTEGER, SEQUENCE)
+        //         // This would require mapping ASN1BaseType to its default UNIVERSAL tag.
+        //     }
+        // }
+        return Optional.empty(); // Placeholder - full implementation is complex and context-dependent.
     }
 
     public Optional<ASN1TypeDefinition> getTypeDefinition(String name) {
         return Optional.ofNullable(typeDefinitions.get(name));
     }
 
-    // Methods to add/get type definitions would go here.
-    // e.g., public ASN1TypeDefinition getType(String name) { ... }
-
+    public Map<String, ASN1TypeDefinition> getAllTypeDefinitions() {
+        return typeDefinitions;
+    }
 }
